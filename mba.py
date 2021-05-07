@@ -37,6 +37,8 @@ def open_box(aname, mailbox):
         # maildir doesn't require locking
         box = Maildir(mailbox)
         yield backup_box, box
+    except KeyboardInterrupt:
+        pass
     except Exception:
         raise
     finally:
