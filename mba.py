@@ -66,27 +66,27 @@ def backup_mail(bbox, mailbox, days):
     ids = [i['Message-Id'] for i in bbox]
     bad_date = re.compile(r'(^.*\([A-Z]{3})([\+\- ][0-9]{0,2})\)')
     tdate = date.today() + relativedelta.relativedelta(days=-days)
-    errs = []
     for key in mailbox.iterkeys():
         # First make sure message is parsed correctly
         try:
             msg = mailbox[key]
         except email.errors.MessageParseError as err:
-            errs.append((key, err))
+            logging.error("Error parsing email message %s\n%s", key, err)
             continue
         try:
-            mdate = parser.parse(msg['Date'])
+            mdate = parser.parse(msg['Date'], ignoretz=True)
         except parser.ParserError:
             # Fix for error I found in some of my email date strings
             tmp = re.sub(bad_date, r"\1)", msg['Date'])
             try:
-                mdate = parser.parse(tmp)
+                mdate = parser.parse(tmp, ignoretz=True)
             except parser.ParserError as err:
-                errs.append((key, err))
+                logging.error("Error parsing email datetime string '%s' in %s\n%s",
+                              tmp, msg['Message-Id'], err)
                 continue
         if msg['Message-Id'] not in ids and mdate.date() < tdate:
             bbox.add(msg)
-    return errs
+            logging.debug("Added message %s", msg['Message-Id'])
 
 
 def parse_arguments():
@@ -117,8 +117,10 @@ def run():
     args = parse_arguments()
     for folder in args.folders:
         path = join(expanduser(args.mailbox), folder)
+        logging.debug("Processing folder %s", path)
         with open_box(expanduser(args.aname), path) as (backup_box, inbox):
-            errs = backup_mail(backup_box, inbox, args.days)
-    print(errs)
+            backup_mail(backup_box, inbox, args.days)
+
+
 if __name__ == "__main__":
     run()
